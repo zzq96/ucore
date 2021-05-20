@@ -1,4 +1,6 @@
 .idea/*
 os/target/*
 os/.idea/*
+bin/
+obj/
 Cargo.lock
