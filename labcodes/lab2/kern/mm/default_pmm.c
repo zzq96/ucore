@@ -2,6 +2,7 @@
 #include <list.h>
 #include <string.h>
 #include <default_pmm.h>
+#include <stdio.h>
 
 /*  In the First Fit algorithm, the allocator keeps a list of free blocks
  * (known as the free list). Once receiving a allocation request for memory,
@@ -102,6 +103,7 @@ static void
 default_init(void)
 {
     list_init(&free_list);
+    cprintf("default_init: %p free_list: %p %p\n", &free_list, free_list.next, free_list.prev);
     nr_free = 0;
 }
 
@@ -119,7 +121,8 @@ default_init_memmap(struct Page *base, size_t n)
     base->property = n;
     SetPageProperty(base);
     nr_free += n;
-    list_add(&free_list, &(base->page_link));
+    list_add_before(&free_list, &(base->page_link));
+    cprintf("init_memmap: n: %d, prev:%p; next:%p\n", n, free_list.prev, free_list.next);
 }
 
 static struct Page *
@@ -143,15 +146,17 @@ default_alloc_pages(size_t n)
     }
     if (page != NULL)
     {
-        list_del(&(page->page_link));
+        for (struct Page *p = page; p != (page + n); ++p)
+            ClearPageProperty(p);
+        list_entry_t *prev_entry = page->page_link.prev;
         if (page->property > n)
         {
             struct Page *p = page + n;
             p->property = page->property - n;
-            list_add(&free_list, &(p->page_link));
+            list_add(&(page->page_link), &(p->page_link));
         }
+        list_del(&(page->page_link));
         nr_free -= n;
-        ClearPageProperty(page);
     }
     return page;
 }
@@ -170,26 +175,54 @@ default_free_pages(struct Page *base, size_t n)
     base->property = n;
     SetPageProperty(base);
     list_entry_t *le = list_next(&free_list);
+    // cprintf("default_free_pages_le: %p freelist: %p prev: %p next: %p \n", le, &free_list, free_list.prev, free_list.next);
+    // list_entry_t *add_after = &free_list.prev;
+    // cprintf("begin\n");
     while (le != &free_list)
     {
         p = le2page(le, page_link);
         le = list_next(le);
         if (base + base->property == p)
         {
+            // add_after = p->page_link.prev;
+            // cprintf("1 %p\n", add_after);
             base->property += p->property;
+            p->property = 0;
             ClearPageProperty(p);
             list_del(&(p->page_link));
         }
         else if (p + p->property == base)
         {
+            // add_after = p->page_link.prev;
+            // cprintf("2 %p\n", add_after);
             p->property += base->property;
+            base->property = 0;
             ClearPageProperty(base);
             base = p;
             list_del(&(p->page_link));
         }
+        else if (base + base->property <= p)
+        {
+            add_after = p->page_link.prev;
+            break;
+        }
+    }
+
+    //吐血, 为了省一点时间, 想把找插入点和上面的循环写在一起, 结果debug 3小时..还是不能贪图小便宜
+    // nr_free += n;
+    // list_add(add_after, &(base->page_link));
+    le = list_next(&free_list);
+    while(le!=&free_list)
+    {
+        p = le2page(le, page_link);
+        le = list_next(le);
+        if(base + base->property <=p)
+        {
+            break;
+        }
     }
     nr_free += n;
-    list_add(&free_list, &(base->page_link));
+    list_add_before(le, &(base->page_link));
 }
 
 static size_t
@@ -201,11 +234,13 @@ default_nr_free_pages(void)
 static void
 basic_check(void)
 {
+    cprintf("basic_check:freelist: %p prev: %p next: %p \n", &free_list, free_list.prev, free_list.next);
     struct Page *p0, *p1, *p2;
     p0 = p1 = p2 = NULL;
     assert((p0 = alloc_page()) != NULL);
     assert((p1 = alloc_page()) != NULL);
     assert((p2 = alloc_page()) != NULL);
+    cprintf("basic_check:freelist: %p prev: %p next: %p \n", &free_list, free_list.prev, free_list.next);
 
     assert(p0 != p1 && p0 != p2 && p1 != p2);
     assert(page_ref(p0) == 0 && page_ref(p1) == 0 && page_ref(p2) == 0);

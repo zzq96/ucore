@@ -303,11 +303,11 @@ void pmm_init(void)
     //First we should init a physical memory manager(pmm) based on the framework.
     //Then pmm can alloc/free the physical memory.
     //Now the first_fit/best_fit/worst_fit/buddy_system pmm are available.
-    init_pmm_manager();
+    init_pmm_manager();//初始化free list
 
     // detect physical memory space, reserve already used memory,
     // then use pmm->init_memmap to create free page list
-    page_init();
+    page_init();//将内存探测得到的内存块中的空闲块加到free list
 
     //use pmm->check to verify the correctness of the alloc/free function in a pmm
     check_alloc_page();
