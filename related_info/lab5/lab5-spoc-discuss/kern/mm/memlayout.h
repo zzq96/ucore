@@ -69,7 +69,7 @@
 /* All physical memory mapped at this address */
 #define KERNBASE            0xC0000000
 #define KMEMSIZE            0x38000000                  // the maximum amount of physical memory
-#define KERNTOP             (KERNBASE + KMEMSIZE)
+#define KERNTOP             (KERNBASE + KMEMSIZE) //ucore中物理空间做映射的最大的虚拟地址空间地址。 在这之上就没做映射了。
 
 /* *
  * Virtual page table. Entry PDX[VPT] in the PD (Page Directory) contains

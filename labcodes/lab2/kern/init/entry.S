@@ -19,13 +19,13 @@ kern_entry:
     # update eip
     # now, eip = 0x1.....
     leal next, %eax
-    # set eip = KERNBASE + 0x1.....
+    # set eip = KERNBASE + 0x1..... jmp to high va
     jmp *%eax
 next:
 
-    # unmap va 0 ~ 4M, it's temporary mapping
+    # unmap va 0 ~ 4M, it's temporary mapping. the va 0 - 4MB is used by user
     xorl %eax, %eax
-    movl %eax, __boot_pgdir
+    movl %eax, __boot_pgdir # the first pde is 0
 
     # set ebp, esp
     movl $0x0, %ebp
@@ -56,11 +56,13 @@ __boot_pgdir:
 .globl __boot_pgdir
     # map va 0 ~ 4M to pa 0 ~ 4M (temporary)
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
-    .space (KERNBASE >> PGSHIFT >> 10 << 2) - (. - __boot_pgdir) # pad to PDE of KERNBASE
+    .space (KERNBASE >> PGSHIFT >> 10 << 2) - (. - __boot_pgdir) # pad to PDE of KERNBASE. a block of space, 
     # map va KERNBASE + (0 ~ 4M) to pa 0 ~ 4M
-    .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
+    .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W) # 0xc0000000's pde
     .space PGSIZE - (. - __boot_pgdir) # pad to PGSIZE
 
+# set two page tables. each is mapped to 0- 4M
+# how to calc pte index?
 .set i, 0
 __boot_pt1:
 .rept 1024

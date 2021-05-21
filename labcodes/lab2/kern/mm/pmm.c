@@ -303,11 +303,12 @@ void pmm_init(void)
     //First we should init a physical memory manager(pmm) based on the framework.
     //Then pmm can alloc/free the physical memory.
     //Now the first_fit/best_fit/worst_fit/buddy_system pmm are available.
-    init_pmm_manager();//初始化free list
+    init_pmm_manager(); //初始化free list
 
     // detect physical memory space, reserve already used memory,
     // then use pmm->init_memmap to create free page list
-    page_init();//将内存探测得到的内存块中的空闲块加到free list
+    // 页帧放在kernel的end之后。
+    page_init(); //将内存探测得到的内存块中的空闲块加到free list
 
     //use pmm->check to verify the correctness of the alloc/free function in a pmm
     check_alloc_page();
@@ -318,6 +319,7 @@ void pmm_init(void)
 
     // recursively insert boot_pgdir in itself
     // to form a virtual page table at virtual address VPT
+    //映射pgdir本身， 讲虚拟地址VPT映射到pgdir的物理地址， 以后访问VPT就可以访问pgdir了
     boot_pgdir[PDX(VPT)] = PADDR(boot_pgdir) | PTE_P | PTE_W;
 
     // map all physical memory to linear memory with base linear addr KERNBASE
@@ -368,6 +370,34 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create)
      *   PTE_W           0x002                   // page table/directory entry flags bit : Writeable
      *   PTE_U           0x004                   // page table/directory entry flags bit : User can access
      */
+    //先找到pde， 看看pt存不存在
+    pde_t *pdep = &pgdir[PDX(la)];
+    if (!(pgdir[PDX(la)] & PTE_P))
+    {
+        if (create == 0)
+            return NULL;
+
+        //不存在就分配
+        struct Page *alloced = alloc_page();
+        if (alloced == NULL)
+            return NULL;
+        set_page_ref(alloced, 1);
+        uintptr_t pa = page2pa(alloced);
+        memset(KADDR(pa), 0, PGSIZE);
+        *pdep = pa | PTE_P | PTE_W | PTE_U;
+    }
+
+    // //看看这pte和页帧和他对应不
+    // if (va_pt[PTX(la)] ^ PTE_P)
+    // {
+    //     //分配一个页帧到pte
+    //     struct Page *alloced = alloc_page();
+    //     assert(alloced != NULL);
+    //     va_pt[PTX(la)] = page2pa(alloced) | PTE_P | PTE_W;
+    //     set_page_ref(alloced, 1);
+    // }
+    return &((pte_t *)KADDR(PDE_ADDR(pgdir[PDX(la)])))[PTX(la)];
+
 #if 0
     pde_t *pdep = NULL;   // (1) find page directory entry
     if (0) {              // (2) check if entry is not present
@@ -420,6 +450,16 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep)
      * DEFINEs:
      *   PTE_P           0x001                   // page table/directory entry flags bit : Present
      */
+    //如果是无效的就直接返回
+    if (*ptep & PTE_P)
+    {
+        struct Page *page = pte2page(*ptep);
+        page_ref_dec(page);
+        if (page_ref(page) == 0)
+            free_page(page);
+        *ptep = 0;
+        tlb_invalidate(pgdir, la);
+    }
 #if 0
     if (0) {                      //(1) check if this page table entry is present
         struct Page *page = NULL; //(2) find corresponding page to pte
