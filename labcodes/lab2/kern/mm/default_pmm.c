@@ -201,11 +201,11 @@ default_free_pages(struct Page *base, size_t n)
             base = p;
             list_del(&(p->page_link));
         }
-        else if (base + base->property <= p)
-        {
-            add_after = p->page_link.prev;
-            break;
-        }
+        // else if (base + base->property <= p)
+        // {
+        //     add_after = p->page_link.prev;
+        //     break;
+        // }
     }
 
     //吐血, 为了省一点时间, 想把找插入点和上面的循环写在一起, 结果debug 3小时..还是不能贪图小便宜
