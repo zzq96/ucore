@@ -13,13 +13,14 @@ struct mm_struct;
 // addr belong to a vma means  vma.vm_start<= addr <vma.vm_end
 struct vma_struct
 {
-    struct mm_struct *vm_mm; // the set of vma using the same PDT
+    struct mm_struct *vm_mm; // the set of vma using the same PDT, 指向了mm头节点
     uintptr_t vm_start;      // start addr of vma
     uintptr_t vm_end;        // end addr of vma, not include the vm_end itself
-    uint32_t vm_flags;       // flags of vma
+    uint32_t vm_flags;       // flags of vma,一些权限比如是否可写等
     list_entry_t list_link;  // linear list link which sorted by start addr of vma
 };
 
+//从list entry 找到vma的起始指针
 #define le2vma(le, member) \
     to_struct((le), struct vma_struct, member)
 
@@ -28,13 +29,14 @@ struct vma_struct
 #define VM_EXEC 0x00000004
 
 // the control struct for a set of vma using the same PDT
+//每个进程一个， 描述了这进程的pddir和合法的虚拟地址空间
 struct mm_struct
 {
     list_entry_t mmap_list;        // linear list link which sorted by start addr of vma
     struct vma_struct *mmap_cache; // current accessed vma, used for speed purpose
     pde_t *pgdir;                  // the PDT of these vma
     int map_count;                 // the count of these vma
-    void *sm_priv;                 // the private data for swap manager
+    void *sm_priv;                 // the private data for swap manager, 用于swap算法
 };
 
 struct vma_struct *find_vma(struct mm_struct *mm, uintptr_t addr);
