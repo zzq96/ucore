@@ -4,7 +4,7 @@ switch_to:                      # switch_to(from, to)
 
     # save from's registers
     movl 4(%esp), %eax          # eax points to from. prev进程的PCB地址
-    popl 0(%eax)                # save eip !popl .当前esp处存的是的call的下一个地址
+    popl 0(%eax)                # save eip to context .当前esp处存的是的idleproc的eip, return地址
     movl %esp, 4(%eax)          # save esp::context of from
     movl %ebx, 8(%eax)          # save ebx::context of from
     movl %ecx, 12(%eax)         # save ecx::context of from

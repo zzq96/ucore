@@ -48,7 +48,7 @@ struct proc_struct {
     struct proc_struct *parent;                 // the parent process
     struct mm_struct *mm;                       // Process's memory management field
     struct context context;                     // Switch here to run process
-    struct trapframe *tf;                       // Trap frame for current interrupt
+    struct trapframe *tf;                       // Trap frame for current interrupt, 用来记录中断的时候的上下文
     uintptr_t cr3;                              // CR3 register: the base addr of Page Directroy Table(PDT)
     uint32_t flags;                             // Process flag
     char name[PROC_NAME_LEN + 1];               // Process name

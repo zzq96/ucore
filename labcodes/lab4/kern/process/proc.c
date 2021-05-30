@@ -104,6 +104,18 @@ alloc_proc(void)
      *       uint32_t flags;                             // Process flag
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
+        proc->state = PROC_UNINIT;
+        proc->pid = -1;
+        proc->runs = 0;
+        proc->kstack = NULL;
+        proc->need_resched = 0;
+        proc->parent = NULL;
+        proc->mm = NULL;
+        memset(&(proc->context), 0, sizeof(proc->context));
+        proc->tf = NULL;
+        proc->cr3 = boot_cr3;
+        proc->flags = 0;
+        memset(&(proc->name), 0, sizeof(proc->name));
     }
     return proc;
 }
@@ -179,8 +191,8 @@ void proc_run(struct proc_struct *proc)
         local_intr_save(intr_flag);
         {
             current = proc;
-            load_esp0(next->kstack + KSTACKSIZE);
-            lcr3(next->cr3);
+            load_esp0(next->kstack + KSTACKSIZE); //设置tss的esp
+            lcr3(next->cr3);                      //恢复页目录寄存器
             switch_to(&(prev->context), &(next->context));
         }
         local_intr_restore(intr_flag);
@@ -193,6 +205,27 @@ void proc_run(struct proc_struct *proc)
 static void
 forkret(void)
 {
+    // .globl forkrets
+    // forkrets:
+    //     # set stack to this new process's trapframe
+    //     movl 4(%esp), %esp //跳过return 地址,
+    //     jmp __trapret //通过中断返回, 恢复tf
+    //
+    // .globl __trapret
+    // __trapret:
+    //     # restore registers from stack
+    //     popal
+
+    //     # restore %ds, %es, %fs and %gs
+    //     popl %gs
+    //     popl %fs
+    //     popl %es
+    //     popl %ds
+
+    //     # get rid of the trap number and error code
+    //     addl $0x8, %esp
+    //     iret
+
     forkrets(current->tf);
 }
 
@@ -229,12 +262,12 @@ int kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
 {
     struct trapframe tf;
     memset(&tf, 0, sizeof(struct trapframe));
-    tf.tf_cs = KERNEL_CS; 
+    tf.tf_cs = KERNEL_CS;
     tf.tf_ds = tf.tf_es = tf.tf_ss = KERNEL_DS;
-    tf.tf_regs.reg_ebx = (uint32_t)fn;
-    tf.tf_regs.reg_edx = (uint32_t)arg;
-    tf.tf_eip = (uint32_t)kernel_thread_entry;
-    return do_fork(clone_flags | CLONE_VM, 0, &tf);
+    tf.tf_regs.reg_ebx = (uint32_t)fn;              //实际的代码地址. call *%ebx   # call fn
+    tf.tf_regs.reg_edx = (uint32_t)arg;             //pushl %edx      # push arg
+    tf.tf_eip = (uint32_t)kernel_thread_entry;      //线程代码的起始地址, 是entry.S这段汇编, 在进入fn之前, 先做一些初始化
+    return do_fork(clone_flags | CLONE_VM, 0, &tf); //为啥stack为0
 }
 
 // setup_kstack - alloc pages with size KSTACKPAGE as process kernel stack
@@ -321,6 +354,34 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
     //    5. insert proc_struct into hash_list && proc_list
     //    6. call wakeup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
+    if ((proc = alloc_proc()) == NULL)
+    {
+        goto fork_out;
+    }
+    proc->parent = current;
+    if (setup_kstack(proc) != 0)
+    {
+        goto bad_fork_cleanup_proc;
+    }
+    if (copy_mm(clone_flags, proc) != 0)
+    {
+        goto bad_fork_cleanup_kstack;
+    }
+    copy_thread(proc, stack, tf);
+
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        proc->pid = get_pid();
+        hash_proc(proc);
+        list_add(&proc_list, &(proc->list_link));
+        nr_process++;
+    }
+    local_intr_restore(intr_flag);
+
+    wakeup_proc(proc); //将proc->state设置为runningable
+
+    ret = proc->pid;
 fork_out:
     return ret;
 
@@ -370,14 +431,15 @@ void proc_init(void)
     }
 
     //设置空闲进程的TCB
+    //不需要设置context,他本来就当前运行着
     idleproc->pid = 0;
     idleproc->state = PROC_RUNNABLE;
     idleproc->kstack = (uintptr_t)bootstack;
-    idleproc->need_resched = 1;//可以被调度出去
+    idleproc->need_resched = 1; //可以被调度出去
     set_proc_name(idleproc, "idle");
     nr_process++;
 
-    current = idleproc;//当前函数就是idleproc进程的代码
+    current = idleproc; //当前函数就是idleproc进程的代码
 
     int pid = kernel_thread(init_main, "Hello world!!", 0);
     if (pid <= 0)
@@ -385,6 +447,7 @@ void proc_init(void)
         panic("create init_main failed.\n");
     }
 
+    //通过pid查找PCB
     initproc = find_proc(pid);
     set_proc_name(initproc, "init");
 
