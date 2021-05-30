@@ -62,6 +62,7 @@ void idt_init(void)
     {
         SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
     }
+    SETGATE(idt[T_SYSCALL], 1, GD_KTEXT, __vectors[T_SYSCALL], DPL_USER);
     lidt(&idt_pd);
 }
 
@@ -269,6 +270,7 @@ trap_dispatch(struct trapframe *tf)
          *    Every TICK_NUM cycle, you should set current process's current->need_resched = 1
          */
         ticks++;
+        current->need_resched = 1;//时间片到了
         if (ticks % TICK_NUM == 0)
         {
             print_ticks();

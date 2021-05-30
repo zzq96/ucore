@@ -117,6 +117,8 @@ alloc_proc(void)
         proc->cr3 = boot_cr3;
         proc->flags = 0;
         memset(proc->name, 0, PROC_NAME_LEN);
+        proc->wait_state = 0;                        //初始化进程等待状态
+        proc->cptr = proc->optr = proc->yptr = NULL; //进程相关指针初始化
     }
     return proc;
 }
@@ -357,6 +359,7 @@ copy_mm(uint32_t clone_flags, struct proc_struct *proc)
     {
         goto bad_mm;
     }
+    //pdt拷贝为boot_pgdir
     if (setup_pgdir(mm) != 0)
     {
         goto bad_pgdir_cleanup_mm;
@@ -455,6 +458,7 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
     }
 
     proc->parent = current;
+    assert(current->wait_state == 0);
 
     if (setup_kstack(proc) != 0)
     {
@@ -471,8 +475,7 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
     {
         proc->pid = get_pid();
         hash_proc(proc);
-        list_add(&proc_list, &(proc->list_link));
-        nr_process++;
+        set_links(proc);
     }
     local_intr_restore(intr_flag);
 
