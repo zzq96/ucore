@@ -229,7 +229,7 @@ int kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
 {
     struct trapframe tf;
     memset(&tf, 0, sizeof(struct trapframe));
-    tf.tf_cs = KERNEL_CS;
+    tf.tf_cs = KERNEL_CS; 
     tf.tf_ds = tf.tf_es = tf.tf_ss = KERNEL_DS;
     tf.tf_regs.reg_ebx = (uint32_t)fn;
     tf.tf_regs.reg_edx = (uint32_t)arg;
@@ -356,25 +356,28 @@ void proc_init(void)
 {
     int i;
 
+    //进程链表初始化
     list_init(&proc_list);
     for (i = 0; i < HASH_LIST_SIZE; i++)
     {
         list_init(hash_list + i);
     }
 
+    //创建空闲进程, 它不停的查询, 看是否有其他内核线程可以执行
     if ((idleproc = alloc_proc()) == NULL)
     {
         panic("cannot alloc idleproc.\n");
     }
 
+    //设置空闲进程的TCB
     idleproc->pid = 0;
     idleproc->state = PROC_RUNNABLE;
     idleproc->kstack = (uintptr_t)bootstack;
-    idleproc->need_resched = 1;
+    idleproc->need_resched = 1;//可以被调度出去
     set_proc_name(idleproc, "idle");
     nr_process++;
 
-    current = idleproc;
+    current = idleproc;//当前函数就是idleproc进程的代码
 
     int pid = kernel_thread(init_main, "Hello world!!", 0);
     if (pid <= 0)

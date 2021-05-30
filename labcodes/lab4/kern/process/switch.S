@@ -3,8 +3,8 @@
 switch_to:                      # switch_to(from, to)
 
     # save from's registers
-    movl 4(%esp), %eax          # eax points to from
-    popl 0(%eax)                # save eip !popl
+    movl 4(%esp), %eax          # eax points to from. prev进程的PCB地址
+    popl 0(%eax)                # save eip !popl .当前esp处存的是的call的下一个地址
     movl %esp, 4(%eax)          # save esp::context of from
     movl %ebx, 8(%eax)          # save ebx::context of from
     movl %ecx, 12(%eax)         # save ecx::context of from
@@ -14,7 +14,7 @@ switch_to:                      # switch_to(from, to)
     movl %ebp, 28(%eax)         # save ebp::context of from
 
     # restore to's registers
-    movl 4(%esp), %eax          # not 8(%esp): popped return address already
+    movl 4(%esp), %eax          # not 8(%esp): popped return address already. next进程的PCB地址
                                 # eax now points to to
     movl 28(%eax), %ebp         # restore ebp::context of to
     movl 24(%eax), %edi         # restore edi::context of to
@@ -24,7 +24,7 @@ switch_to:                      # switch_to(from, to)
     movl 8(%eax), %ebx          # restore ebx::context of to
     movl 4(%eax), %esp          # restore esp::context of to
 
-    pushl 0(%eax)               # push eip
+    pushl 0(%eax)               # push eip, 恢复这个进程的eip到栈中, ret之后cpu自动跳到eip的地址
 
     ret
 
