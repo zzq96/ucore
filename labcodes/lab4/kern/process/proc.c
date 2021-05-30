@@ -191,8 +191,8 @@ void proc_run(struct proc_struct *proc)
         local_intr_save(intr_flag);
         {
             current = proc;
-            load_esp0(next->kstack + KSTACKSIZE); //设置tss的esp
-            lcr3(next->cr3);                      //恢复页目录寄存器
+            load_esp0(next->kstack + KSTACKSIZE); //设置tss的esp0, 特权级为0, iret之后会恢复esp0, 内核栈切换到新的线程的内核栈
+            lcr3(next->cr3);                      //恢复页目录寄存器, 对于内核线程来说 ,都一样
             switch_to(&(prev->context), &(next->context));
         }
         local_intr_restore(intr_flag);
