@@ -460,6 +460,16 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep)
                                   //(6) flush tlb
     }
 #endif
+    if (*ptep & PTE_P)
+    {
+        struct Page *page = pte2page(*ptep);
+        if (page_ref_dec(page) == 0)
+        {
+            free_page(page);
+        }
+        *ptep = 0;
+        tlb_invalidate(pgdir, la);
+    }
 }
 
 void unmap_range(pde_t *pgdir, uintptr_t start, uintptr_t end)
