@@ -4,3 +4,6 @@ os/.idea/*
 bin/
 obj/
 Cargo.lock
+*.out
+*.log
+*.in
