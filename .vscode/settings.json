@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "default_pmm.h": "c"
+        "default_pmm.h": "c",
+        "dirent.h": "c",
+        "assert.h": "c",
+        "inode.h": "c"
     }
 }

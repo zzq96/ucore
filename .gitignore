@@ -7,3 +7,4 @@ Cargo.lock
 *.out
 *.log
 *.in
+disk0/
